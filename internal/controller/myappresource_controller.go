@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	myv1alpha1 "github.com/domenicbove/angi/api/v1alpha1"
@@ -34,16 +35,10 @@ type MyAppResourceReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the MyAppResource object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
+	// get myappresource cr
 	var myAppResource myv1alpha1.MyAppResource
 	if err := r.Get(ctx, req.NamespacedName, &myAppResource); err != nil {
 		log.Error(err, "unable to fetch MyAppResource")
@@ -53,37 +48,30 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// get existing podinfo deployment
 	deployment := appsv1.Deployment{}
 	err := r.Client.Get(ctx, client.ObjectKey{Namespace: myAppResource.Namespace, Name: myAppResource.Name}, &deployment)
 	if errors.IsNotFound(err) {
-		log.Info("could not find existing PodInfo Deployment for MyAppResource, creating one...")
-
-		deployment, err := r.constructPodInfoDeployment(&myAppResource)
-		if err != nil {
-			log.Error(err, "unable to construct PodInfo Deployment from MyAppResource")
-			// don't bother requeuing until we get a change to the spec
-			return ctrl.Result{}, nil
-		}
-
-		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "unable to create PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
-			return ctrl.Result{}, err
-		}
-
-		log.V(1).Info("created PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
-
-		// TODO event recorder here?
-		r.Recorder.Eventf(&myAppResource, corev1.EventTypeNormal, "Created", "Created deployment %q", deployment.Name)
-
-		return ctrl.Result{}, nil
+		// if it does not exist, create in next step
+		deployment = *constructPodInfoDeployment(myAppResource)
 	}
-	if err != nil {
+	if client.IgnoreNotFound(err) != nil {
 		log.Error(err, "failed to get PodInfo Deployment for MyAppResource")
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info("found PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
+	// get deployment spec updates
+	newDeployment := *constructPodInfoDeployment(myAppResource)
+	specr := deploymentSpecr(&deployment, newDeployment.Spec)
 
+	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &deployment, specr); err != nil {
+		log.Error(err, "unable to create or update PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
+		return ctrl.Result{}, err
+	} else {
+		log.V(1).Info(fmt.Sprintf("%s PodInfo Deployment for MyAppResource", operation), "deployment", deployment.Name)
+	}
+
+	// update the CR status
 	if myAppResource.Status.PodInfoReadyReplicas != deployment.Status.ReadyReplicas {
 
 		log.V(1).Info("updating MyAppResource status", "myappresource", myAppResource.Name)
@@ -98,14 +86,22 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *MyAppResourceReconciler) constructPodInfoDeployment(myAppResource *myv1alpha1.MyAppResource) (*appsv1.Deployment, error) {
+func deploymentSpecr(deploy *appsv1.Deployment, spec appsv1.DeploymentSpec) controllerutil.MutateFn {
+	return func() error {
+		deploy.Spec = spec
+		return nil
+	}
+}
+
+func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.Deployment {
 	image := fmt.Sprintf("%s:%s", myAppResource.Spec.Image.Repository, myAppResource.Spec.Image.Tag)
 
 	depl := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      myAppResource.Name,
-			Namespace: myAppResource.Namespace,
+			Name:            myAppResource.Name,
+			Namespace:       myAppResource.Namespace,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: myAppResource.Spec.ReplicaCount,
@@ -137,11 +133,11 @@ func (r *MyAppResourceReconciler) constructPodInfoDeployment(myAppResource *myv1
 		},
 	}
 
-	if err := ctrl.SetControllerReference(myAppResource, depl, r.Scheme); err != nil {
-		return nil, err
-	}
+	// if err := ctrl.SetControllerReference(&myAppResource, depl, r.Scheme); err != nil {
+	// 	return nil, err
+	// }
 
-	return depl, nil
+	return depl
 }
 
 var (
