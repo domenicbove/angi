@@ -70,7 +70,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		log.V(1).Info("created PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
 
 		// TODO event recorder here?
-		r.Recorder.Eventf(&myKind, core.EventTypeNormal, "Created", "Created deployment %q", deployment.Name)
+		// r.Recorder.Eventf(&myKind, core.EventTypeNormal, "Created", "Created deployment %q", deployment.Name)
 
 		return ctrl.Result{}, nil
 	}
