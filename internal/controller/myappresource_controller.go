@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -20,6 +21,8 @@ import (
 type MyAppResourceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=my.api.group,resources=myappresources,verbs=get;list;watch;create;update;patch;delete
@@ -70,7 +73,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		log.V(1).Info("created PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
 
 		// TODO event recorder here?
-		// r.Recorder.Eventf(&myKind, core.EventTypeNormal, "Created", "Created deployment %q", deployment.Name)
+		r.Recorder.Eventf(&myAppResource, corev1.EventTypeNormal, "Created", "Created deployment %q", deployment.Name)
 
 		return ctrl.Result{}, nil
 	}
@@ -81,11 +84,15 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	log.V(1).Info("found PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
 
-	log.V(1).Info("updating MyAppResource status", "myappresource", myAppResource.Name)
-	myAppResource.Status.PodInfoReadyReplicas = deployment.Status.ReadyReplicas
-	if r.Client.Status().Update(ctx, &myAppResource); err != nil {
-		log.Error(err, "failed to update MyAppResource status", "myappresource", myAppResource.Name)
-		return ctrl.Result{}, err
+	if myAppResource.Status.PodInfoReadyReplicas != deployment.Status.ReadyReplicas {
+
+		log.V(1).Info("updating MyAppResource status", "myappresource", myAppResource.Name)
+
+		myAppResource.Status.PodInfoReadyReplicas = deployment.Status.ReadyReplicas
+		if r.Client.Status().Update(ctx, &myAppResource); err != nil {
+			log.Error(err, "failed to update MyAppResource status", "myappresource", myAppResource.Name)
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
