@@ -47,8 +47,9 @@ type UI struct {
 
 // MyAppResourceStatus defines the observed state of MyAppResource
 type MyAppResourceStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// podInfoReadyReplicas is the number of pods targeted by the PodInfo Deployment with a Ready Condition.
+	// +optional
+	PodInfoReadyReplicas int32 `json:"podInfoReadyReplicas,omitempty"`
 }
 
 //+kubebuilder:object:root=true
