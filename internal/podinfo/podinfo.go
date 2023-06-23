@@ -49,12 +49,15 @@ func ConstructPodInfoDeployment(myAppResource v1alpha1.MyAppResource) *appsv1.De
 							Ports: []corev1.ContainerPort{
 								{ContainerPort: Port, Name: "http", Protocol: "TCP"},
 							},
-							// Resources: *watchlist.Spec.Frontend.Resources.DeepCopy(),
 						},
 					},
 				},
 			},
 		},
+	}
+
+	if &myAppResource.Spec.Resources != nil {
+		deployment.Spec.Template.Spec.Containers[0].Resources = *myAppResource.Spec.Resources.DeepCopy()
 	}
 
 	// add the redis env var if redis enabled

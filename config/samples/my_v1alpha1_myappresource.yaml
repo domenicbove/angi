@@ -9,15 +9,18 @@ metadata:
     app.kubernetes.io/created-by: angi
   name: whatever
 spec:
-  # replicaCount: 2
-  # resources:
+  replicaCount: 2
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 100m
   #   memoryLimit: 64Mi
   #   cpuRequest: 100m
-  # image:
-  #   repository: ghcr.io/stefanprodan/podinfo
-  #   tag: latest
-  # ui:
-  #   color: "#34577c"
-  #   message: "some string"
+  image:
+    repository: ghcr.io/stefanprodan/podinfo
+    tag: latest
+  ui:
+    color: "#34577c"
+    message: "some string"
   # redis:
   #   enabled: true

@@ -82,6 +82,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// create or update the redis deployment and service
 	var redisDeployment *appsv1.Deployment
 	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
 
@@ -102,7 +103,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// create or update the podInfoDeployment
+	// create or update the podInfo deployment
 	podInfoDeployment, err := r.createOrUpdateDeployment(ctx, myAppResource.Name,
 		myAppResource.Namespace, podinfo.ConstructPodInfoDeployment(myAppResource))
 

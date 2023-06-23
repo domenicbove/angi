@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,7 +13,8 @@ type MyAppResourceSpec struct {
 	// ReplicaCount sets the pod replicas for the PodInfo Deployment.
 	ReplicaCount *int32 `json:"replicaCount,omitempty"`
 
-	// TODO resources
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +optional
 	Image Image `json:"image,omitempty"`
@@ -22,6 +24,29 @@ type MyAppResourceSpec struct {
 	// +optional
 	Redis *Redis `json:"redis,omitempty"`
 }
+
+// // Resources describes the Pod Resources in the PodInfo Deployment.
+// type Resources struct {
+// 	// +optional
+// 	// MemoryRequest describes the minimum amount of memory required for the pod.
+// 	// If MemoryRequest is omitted for a container, it defaults to MemoryLimit if that is explicitly specified,
+// 	// otherwise to an implementation-defined value.
+// 	MemoryRequest string `json:"memoryRequest,omitempty"`
+
+// 	// +optional
+// 	// MemoryLimit sets the maximum amount of memory allowed for the pod.
+// 	MemoryLimit string `json:"memoryLimit,omitempty"`
+
+// 	// +optional
+// 	// CpuRequest describes the minimum amount of cpu required for the pod
+// 	// If CpuRequest is omitted for a container, it defaults to CpuLimit if that is explicitly specified,
+// 	// otherwise to an implementation-defined value.
+// 	CpuRequest string `json:"cpuRequest,omitempty"`
+
+// 	// +optional
+// 	// CpuLimit sets the maximum amount of cpu allowed for the pod.
+// 	CpuLimit string `json:"cpuLimit,omitempty"`
+// }
 
 // Image describes the PodInfo Container image.
 type Image struct {
