@@ -15,7 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	myv1alpha1 "github.com/domenicbove/angi/api/v1alpha1"
+	"github.com/domenicbove/angi/api/v1alpha1"
+	"github.com/domenicbove/angi/internal/podinfo"
 	"github.com/domenicbove/angi/internal/redis"
 )
 
@@ -40,7 +41,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	log := log.FromContext(ctx)
 
 	// get myappresource cr
-	var myAppResource myv1alpha1.MyAppResource
+	var myAppResource v1alpha1.MyAppResource
 	if err := r.Get(ctx, req.NamespacedName, &myAppResource); err != nil {
 		log.Error(err, "unable to fetch MyAppResource")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
@@ -71,7 +72,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// create or update the podInfoDeployment
 	podInfoDeployment, err := r.createOrUpdateDeployment(ctx, myAppResource.Name,
-		myAppResource.Namespace, constructPodInfoDeployment(myAppResource))
+		myAppResource.Namespace, podinfo.ConstructPodInfoDeployment(myAppResource))
 
 	if err != nil {
 		return ctrl.Result{}, err
@@ -111,17 +112,17 @@ func (r *MyAppResourceReconciler) createOrUpdateDeployment(ctx context.Context, 
 		deployment = *updatedDeployment
 	}
 	if client.IgnoreNotFound(err) != nil {
-		log.Error(err, "failed to get Deployment for MyAppResource", "deployment", deployment.Name)
+		log.Error(err, "failed to get Deployment for MyAppResource", "myappresource", name, "deployment", deployment.Name)
 		return nil, err
 	}
 
 	specr := deploymentSpecr(&deployment, updatedDeployment.Spec)
 
 	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &deployment, specr); err != nil {
-		log.Error(err, "unable to create or update Deployment for MyAppResource", "deployment", deployment.Name)
+		log.Error(err, "unable to create or update Deployment for MyAppResource", "myappresource", name, "deployment", deployment.Name)
 		return nil, err
 	} else {
-		log.V(1).Info(fmt.Sprintf("%s Deployment for MyAppResource", operation), "deployment", deployment.Name)
+		log.V(1).Info(fmt.Sprintf("%s Deployment for MyAppResource", operation), "myappresource", name, "deployment", deployment.Name)
 	}
 
 	return &deployment, nil
@@ -145,17 +146,17 @@ func (r *MyAppResourceReconciler) createOrUpdateService(ctx context.Context, nam
 		service = *updatedService
 	}
 	if client.IgnoreNotFound(err) != nil {
-		log.Error(err, "failed to get service", "service", service.Name)
+		log.Error(err, "failed to get Service for MyAppResource", "myappresource", name, "service", service.Name)
 		return err
 	}
 
 	specr := serviceSpecr(&service, updatedService.Spec)
 
 	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &service, specr); err != nil {
-		log.Error(err, "unable to create or update Service for MyAppResource", "service", service.Name)
+		log.Error(err, "unable to create or update Service for MyAppResource", "myappresource", name, "service", service.Name)
 		return err
 	} else {
-		log.V(1).Info(fmt.Sprintf("%s Service for MyAppResource", operation), "service", service.Name)
+		log.V(1).Info(fmt.Sprintf("%s Service for MyAppResource", operation), "myappresource", name, "service", service.Name)
 	}
 
 	return nil
@@ -169,58 +170,9 @@ func serviceSpecr(service *corev1.Service, spec corev1.ServiceSpec) controllerut
 	}
 }
 
-func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.Deployment {
-	image := fmt.Sprintf("%s:%s", myAppResource.Spec.Image.Repository, myAppResource.Spec.Image.Tag)
-
-	deployment := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            myAppResource.Name,
-			Namespace:       myAppResource.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: myAppResource.Spec.ReplicaCount,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": myAppResource.Name},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": myAppResource.Name},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "podinfo",
-							Image: image,
-							Env: []corev1.EnvVar{
-								// {Name: "PODINFO_CACHE_SERVER", Value: redis.Status.RedisServiceName},
-								{Name: "PODINFO_UI_COLOR", Value: myAppResource.Spec.UI.Color},
-								{Name: "PODINFO_UI_MESSAGE", Value: myAppResource.Spec.UI.Message},
-							},
-							Ports: []corev1.ContainerPort{
-								{ContainerPort: 9898, Name: "http", Protocol: "TCP"},
-							},
-							// Resources: *watchlist.Spec.Frontend.Resources.DeepCopy(),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// add the redis env var if redis enabled
-	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
-		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env,
-			corev1.EnvVar{Name: "PODINFO_CACHE_SERVER", Value: redis.GetEndpoint(myAppResource.Name, myAppResource.Namespace)})
-	}
-
-	return deployment
-}
-
 var (
 	jobOwnerKey = ".metadata.controller"
-	apiGVStr    = myv1alpha1.GroupVersion.String()
+	apiGVStr    = v1alpha1.GroupVersion.String()
 )
 
 // SetupWithManager sets up the controller with the Manager.
@@ -245,7 +197,7 @@ func (r *MyAppResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&myv1alpha1.MyAppResource{}).
+		For(&v1alpha1.MyAppResource{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }
