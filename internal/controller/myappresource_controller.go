@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	myv1alpha1 "github.com/domenicbove/angi/api/v1alpha1"
+	"github.com/domenicbove/angi/internal/redis"
 )
 
 // MyAppResourceReconciler reconciles a MyAppResource object
@@ -51,20 +51,22 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var redisDeployment *appsv1.Deployment
 	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
-		redis, err := r.createOrUpdateDeployment(ctx, fmt.Sprintf("%s-redis", myAppResource.Name),
-			myAppResource.Namespace, constructRedisDeployment(myAppResource))
+
+		redisName := redis.GetDeploymentName(myAppResource.Name)
+
+		var err error
+		redisDeployment, err = r.createOrUpdateDeployment(ctx, redisName, myAppResource.Namespace,
+			redis.ConstructRedisDeployment(myAppResource))
 
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		redisDeployment = redis
 
-		if err := r.createOrUpdateService(ctx, fmt.Sprintf("%s-redis", myAppResource.Name),
-			myAppResource.Namespace, constructRedisService(myAppResource)); err != nil {
+		if err := r.createOrUpdateService(ctx, redisName, myAppResource.Namespace,
+			redis.ConstructRedisService(myAppResource)); err != nil {
 
 			return ctrl.Result{}, err
 		}
-
 	}
 
 	// create or update the podInfoDeployment
@@ -207,81 +209,13 @@ func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.
 		},
 	}
 
-	return deployment
-}
-
-func constructRedisDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.Deployment {
-
-	replicas := int32(1)
-	name := fmt.Sprintf("%s-redis", myAppResource.Name)
-
-	deployment := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       myAppResource.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": name},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": name},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "redis",
-							Image: "redis/redis-stack:latest",
-							Ports: []corev1.ContainerPort{
-								{ContainerPort: 6379, Name: "redis", Protocol: "TCP"},
-							},
-						},
-					},
-				},
-			},
-		},
+	// add the redis env var if redis enabled
+	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env,
+			corev1.EnvVar{Name: "PODINFO_CACHE_SERVER", Value: redis.GetEndpoint(myAppResource.Name, myAppResource.Namespace)})
 	}
 
 	return deployment
-}
-
-func constructRedisService(myAppResource myv1alpha1.MyAppResource) *corev1.Service {
-	name := fmt.Sprintf("%s-redis", myAppResource.Name)
-
-	targetPort := intstr.IntOrString{
-		IntVal: 6379,
-	}
-
-	service := &corev1.Service{
-		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       myAppResource.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
-		},
-		// 		spec:
-		//   type: ClusterIP
-		//   ports:
-		//   - name: redis
-		//     port: 6379
-		//     targetPort: 6379
-		//   selector:
-		//     app: redis
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{Name: "redis", Port: 6379, TargetPort: targetPort},
-			},
-			Selector: map[string]string{
-				"app": name,
-			},
-		},
-	}
-
-	return service
 }
 
 var (
