@@ -50,6 +50,38 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// in the case someone disables redis after enabling it, it should be cleaned up
+	if myAppResource.Spec.Redis == nil || !myAppResource.Spec.Redis.Enabled {
+		name := redis.GetDeploymentName(myAppResource.Name)
+		lookupKey := client.ObjectKey{Namespace: myAppResource.Namespace, Name: name}
+
+		redisDeployment := appsv1.Deployment{}
+		err := r.Client.Get(ctx, lookupKey, &redisDeployment)
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "unable to fetch Redis Deployment")
+		}
+		if err == nil {
+			// deployment was fetched successfully, should be deleted
+			if err := r.Delete(ctx, &redisDeployment); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.V(1).Info("deleted Deployment for MyAppResource", "myappresource", myAppResource.Name, "deployment", name)
+		}
+
+		redisService := corev1.Service{}
+		err = r.Client.Get(ctx, lookupKey, &redisService)
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "unable to fetch Redis Service")
+		}
+		if err == nil {
+			// service was fetched successfully, should be deleted
+			if err := r.Delete(ctx, &redisService); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.V(1).Info("deleted Service for MyAppResource", "myappresource", myAppResource.Name, "service", name)
+		}
+	}
+
 	var redisDeployment *appsv1.Deployment
 	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
 
