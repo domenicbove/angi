@@ -17,7 +17,6 @@ import (
 
 var _ = Describe("MyAppResource controller", func() {
 
-	// Define utility constants for object names and testing timeouts/durations and intervals.
 	const (
 		MyAppResourceName      = "whatever"
 		MyAppResourceNamespace = "default"

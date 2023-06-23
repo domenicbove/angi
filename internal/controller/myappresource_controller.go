@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,9 +30,9 @@ type MyAppResourceReconciler struct {
 //+kubebuilder:rbac:groups=my.api.group,resources=myappresources,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=my.api.group,resources=myappresources/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=my.api.group,resources=myappresources/finalizers,verbs=update
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=list;watch;get;patch;create;update
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
-// +kubebuilder:rbac:groups=core,resources=services,verbs=list;watch;get;patch;create;update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=list;watch;get;patch;create;update
+//+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
+//+kubebuilder:rbac:groups=core,resources=services,verbs=list;watch;get;patch;create;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -48,35 +49,46 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// get existing podinfo deployment
-	deployment := appsv1.Deployment{}
-	err := r.Client.Get(ctx, client.ObjectKey{Namespace: myAppResource.Namespace, Name: myAppResource.Name}, &deployment)
-	if errors.IsNotFound(err) {
-		// if it does not exist, create in next step
-		deployment = *constructPodInfoDeployment(myAppResource)
-	}
-	if client.IgnoreNotFound(err) != nil {
-		log.Error(err, "failed to get PodInfo Deployment for MyAppResource")
-		return ctrl.Result{}, err
+	var redisDeployment *appsv1.Deployment
+	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
+		redis, err := r.createOrUpdateDeployment(ctx, fmt.Sprintf("%s-redis", myAppResource.Name),
+			myAppResource.Namespace, constructRedisDeployment(myAppResource))
+
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		redisDeployment = redis
+
+		if err := r.createOrUpdateService(ctx, fmt.Sprintf("%s-redis", myAppResource.Name),
+			myAppResource.Namespace, constructRedisService(myAppResource)); err != nil {
+
+			return ctrl.Result{}, err
+		}
+
 	}
 
-	// get deployment spec updates
-	newDeployment := *constructPodInfoDeployment(myAppResource)
-	specr := deploymentSpecr(&deployment, newDeployment.Spec)
+	// create or update the podInfoDeployment
+	podInfoDeployment, err := r.createOrUpdateDeployment(ctx, myAppResource.Name,
+		myAppResource.Namespace, constructPodInfoDeployment(myAppResource))
 
-	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &deployment, specr); err != nil {
-		log.Error(err, "unable to create or update PodInfo Deployment for MyAppResource", "deployment", deployment.Name)
+	if err != nil {
 		return ctrl.Result{}, err
-	} else {
-		log.V(1).Info(fmt.Sprintf("%s PodInfo Deployment for MyAppResource", operation), "deployment", deployment.Name)
 	}
 
 	// update the CR status
-	if myAppResource.Status.PodInfoReadyReplicas != deployment.Status.ReadyReplicas {
+	updateStatus := false
+	if redisDeployment != nil && redisDeployment.Status.ReadyReplicas != myAppResource.Status.RedisReadyReplicas {
+		updateStatus = true
+		myAppResource.Status.RedisReadyReplicas = redisDeployment.Status.ReadyReplicas
+	}
+	if myAppResource.Status.PodInfoReadyReplicas != podInfoDeployment.Status.ReadyReplicas {
+		updateStatus = true
+		myAppResource.Status.PodInfoReadyReplicas = podInfoDeployment.Status.ReadyReplicas
+	}
 
+	if updateStatus {
 		log.V(1).Info("updating MyAppResource status", "myappresource", myAppResource.Name)
 
-		myAppResource.Status.PodInfoReadyReplicas = deployment.Status.ReadyReplicas
 		if r.Client.Status().Update(ctx, &myAppResource); err != nil {
 			log.Error(err, "failed to update MyAppResource status", "myappresource", myAppResource.Name)
 			return ctrl.Result{}, err
@@ -86,9 +98,71 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
+func (r *MyAppResourceReconciler) createOrUpdateDeployment(ctx context.Context, name, namespace string, updatedDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	log := log.FromContext(ctx)
+
+	// get existing podinfo deployment
+	deployment := appsv1.Deployment{}
+	err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deployment)
+	if errors.IsNotFound(err) {
+		// if it does not exist, create in next step
+		deployment = *updatedDeployment
+	}
+	if client.IgnoreNotFound(err) != nil {
+		log.Error(err, "failed to get Deployment for MyAppResource", "deployment", deployment.Name)
+		return nil, err
+	}
+
+	specr := deploymentSpecr(&deployment, updatedDeployment.Spec)
+
+	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &deployment, specr); err != nil {
+		log.Error(err, "unable to create or update Deployment for MyAppResource", "deployment", deployment.Name)
+		return nil, err
+	} else {
+		log.V(1).Info(fmt.Sprintf("%s Deployment for MyAppResource", operation), "deployment", deployment.Name)
+	}
+
+	return &deployment, nil
+}
+
 func deploymentSpecr(deploy *appsv1.Deployment, spec appsv1.DeploymentSpec) controllerutil.MutateFn {
 	return func() error {
 		deploy.Spec = spec
+		return nil
+	}
+}
+
+func (r *MyAppResourceReconciler) createOrUpdateService(ctx context.Context, name, namespace string, updatedService *corev1.Service) error {
+	log := log.FromContext(ctx)
+
+	// get existing service
+	service := corev1.Service{}
+	err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &service)
+	if errors.IsNotFound(err) {
+		// if it does not exist, create in next step
+		service = *updatedService
+	}
+	if client.IgnoreNotFound(err) != nil {
+		log.Error(err, "failed to get service", "service", service.Name)
+		return err
+	}
+
+	specr := serviceSpecr(&service, updatedService.Spec)
+
+	if operation, err := controllerutil.CreateOrUpdate(ctx, r.Client, &service, specr); err != nil {
+		log.Error(err, "unable to create or update Service for MyAppResource", "service", service.Name)
+		return err
+	} else {
+		log.V(1).Info(fmt.Sprintf("%s Service for MyAppResource", operation), "service", service.Name)
+	}
+
+	return nil
+}
+
+// TODO try in code func definition
+func serviceSpecr(service *corev1.Service, spec corev1.ServiceSpec) controllerutil.MutateFn {
+	return func() error {
+		service.Spec = spec
 		return nil
 	}
 }
@@ -134,6 +208,80 @@ func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.
 	}
 
 	return deployment
+}
+
+func constructRedisDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.Deployment {
+
+	replicas := int32(1)
+	name := fmt.Sprintf("%s-redis", myAppResource.Name)
+
+	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       myAppResource.Namespace,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": name},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": name},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis",
+							Image: "redis/redis-stack:latest",
+							Ports: []corev1.ContainerPort{
+								{ContainerPort: 6379, Name: "redis", Protocol: "TCP"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return deployment
+}
+
+func constructRedisService(myAppResource myv1alpha1.MyAppResource) *corev1.Service {
+	name := fmt.Sprintf("%s-redis", myAppResource.Name)
+
+	targetPort := intstr.IntOrString{
+		IntVal: 6379,
+	}
+
+	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       myAppResource.Namespace,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&myAppResource, myv1alpha1.GroupVersion.WithKind("MyAppResource"))},
+		},
+		// 		spec:
+		//   type: ClusterIP
+		//   ports:
+		//   - name: redis
+		//     port: 6379
+		//     targetPort: 6379
+		//   selector:
+		//     app: redis
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{Name: "redis", Port: 6379, TargetPort: targetPort},
+			},
+			Selector: map[string]string{
+				"app": name,
+			},
+		},
+	}
+
+	return service
 }
 
 var (

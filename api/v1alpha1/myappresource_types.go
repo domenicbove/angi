@@ -19,6 +19,9 @@ type MyAppResourceSpec struct {
 
 	UI UI `json:"ui"`
 
+	// +optional
+	Redis *Redis `json:"redis,omitempty"`
+
 	// TODO redis
 }
 
@@ -45,11 +48,20 @@ type UI struct {
 	Message string `json:"message"`
 }
 
+// Redis describes the Redis Deployment.
+type Redis struct {
+	// Enabled specifies to deploy a backing redis deployment.
+	Enabled bool `json:"enabled"`
+}
+
 // MyAppResourceStatus defines the observed state of MyAppResource
 type MyAppResourceStatus struct {
 	// podInfoReadyReplicas is the number of pods targeted by the PodInfo Deployment with a Ready Condition.
 	// +optional
 	PodInfoReadyReplicas int32 `json:"podInfoReadyReplicas,omitempty"`
+	// RedisReadyReplicas is the number of pods targeted by the Redis Deployment with a Ready Condition.
+	// +optional
+	RedisReadyReplicas int32 `json:"redisReadyReplicas,omitempty"`
 }
 
 //+kubebuilder:object:root=true
