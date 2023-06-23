@@ -1,8 +1,60 @@
-# angi
-// TODO(user): Add simple overview of use/purpose
+# Angi Controller Practical
+A simple K8s Operator for deploying PodInfo with a backing Redis Cache
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+The Operator watches the MyAppResource CR, which looks like:
+```
+apiVersion: my.api.group/v1alpha1
+kind: MyAppResource
+metadata:
+  name: whatever
+spec:
+  replicaCount: 2
+  resources:
+    memoryLimit: 64Mi
+    cpuRequest: 100m
+  image:
+    repository: ghcr.io/stefanprodan/podinfo
+    tag: latest
+  ui:
+    color: "#34577c"
+    message: "some string"
+  redis:
+    enabled: true
+```
+
+And maps those settings into fields within a [PodInfo](https://github.com/stefanprodan/podinfo) and [Redis](https://github.com/stefanprodan/podinfo) Deployment.
+
+The source code was scaffolded with kubebuilder, see below for the many `make` commands. But the simplest getting started is this:
+
+1. Run UTs:
+```
+make test
+```
+
+2. Install CRDs:
+```
+make install
+```
+
+3. Run the operator locally
+```
+make run
+```
+
+4. Deploy sample CR:
+```
+kubectl apply -f config/samples/my_v1alpha1_myappresource.yaml
+```
+*Edit that file and rerun apply to see updates*
+
+5. Delete CR:
+```
+kubectl delete -f config/samples/my_v1alpha1_myappresource.yaml
+```
+
+6. Stop the operator with Ctrl+C
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
