@@ -25,7 +25,7 @@ var _ = Describe("MyAppResource controller", func() {
 	)
 
 	Context("When creating MyAppResourceName", func() {
-		It("Should create PodInfo Deployment", func() {
+		It("Should create MyAppResourceName", func() {
 			By("By creating a new MyAppResourceName")
 			ctx := context.Background()
 
@@ -58,7 +58,6 @@ var _ = Describe("MyAppResource controller", func() {
 			myAppResourceLookupKey := types.NamespacedName{Name: MyAppResourceName, Namespace: MyAppResourceNamespace}
 			createdMyAppResource := &myv1alpha1.MyAppResource{}
 
-			// We'll need to retry getting this newly created CronJob, given that creation may not immediately happen.
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, myAppResourceLookupKey, createdMyAppResource)
 				if err != nil {
@@ -66,21 +65,74 @@ var _ = Describe("MyAppResource controller", func() {
 				}
 				return true
 			}, timeout, interval).Should(BeTrue())
-			// Let's make sure our Schedule string value was properly converted/handled.
+
 			Expect(createdMyAppResource.Spec.UI.Color).Should(Equal("#34577c"))
 
-			// Delete
 			By("Expecting to delete successfully")
 			Eventually(func() error {
-				f := &myv1alpha1.MyAppResource{}
-				k8sClient.Get(context.Background(), myAppResourceLookupKey, f)
-				return k8sClient.Delete(context.Background(), f)
+				myApp := &myv1alpha1.MyAppResource{}
+				k8sClient.Get(context.Background(), myAppResourceLookupKey, myApp)
+				return k8sClient.Delete(context.Background(), myApp)
 			}, timeout, interval).Should(Succeed())
 
 			By("Expecting to delete finish")
 			Eventually(func() error {
-				f := &myv1alpha1.MyAppResource{}
-				return k8sClient.Get(context.Background(), myAppResourceLookupKey, f)
+				myApp := &myv1alpha1.MyAppResource{}
+				return k8sClient.Get(context.Background(), myAppResourceLookupKey, myApp)
+			}, timeout, interval).ShouldNot(Succeed())
+		})
+
+		It("Should create MyAppResourceName with Defaults", func() {
+			By("By creating a new MyAppResourceName without optional fields")
+			ctx := context.Background()
+
+			myAppResource := &myv1alpha1.MyAppResource{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "my.api.group/v1alpha1",
+					Kind:       "MyAppResource",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      MyAppResourceName,
+					Namespace: MyAppResourceNamespace,
+				},
+				Spec: myv1alpha1.MyAppResourceSpec{
+					UI: myv1alpha1.UI{
+						Color:   "#34577c",
+						Message: "some message",
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, myAppResource)).Should(Succeed())
+
+			myAppResourceLookupKey := types.NamespacedName{Name: MyAppResourceName, Namespace: MyAppResourceNamespace}
+			createdMyAppResource := &myv1alpha1.MyAppResource{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, myAppResourceLookupKey, createdMyAppResource)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(createdMyAppResource.Spec.UI.Color).Should(Equal("#34577c"))
+
+			Expect(*createdMyAppResource.Spec.ReplicaCount).Should(Equal(int32(1)))
+			Expect(createdMyAppResource.Spec.Image.Repository).Should(Equal("ghcr.io/stefanprodan/podinfo"))
+			Expect(createdMyAppResource.Spec.Image.Tag).Should(Equal("latest"))
+
+			By("Expecting to delete successfully")
+			Eventually(func() error {
+				myApp := &myv1alpha1.MyAppResource{}
+				k8sClient.Get(context.Background(), myAppResourceLookupKey, myApp)
+				return k8sClient.Delete(context.Background(), myApp)
+			}, timeout, interval).Should(Succeed())
+
+			By("Expecting to delete finish")
+			Eventually(func() error {
+				myApp := &myv1alpha1.MyAppResource{}
+				return k8sClient.Get(context.Background(), myAppResourceLookupKey, myApp)
 			}, timeout, interval).ShouldNot(Succeed())
 		})
 	})

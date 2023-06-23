@@ -89,7 +89,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	// https://github.com/kubernetes-sigs/controller-runtime/issues/1571
+	// Simple hack found here: https://github.com/kubernetes-sigs/controller-runtime/issues/1571
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
