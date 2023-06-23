@@ -96,7 +96,7 @@ func deploymentSpecr(deploy *appsv1.Deployment, spec appsv1.DeploymentSpec) cont
 func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.Deployment {
 	image := fmt.Sprintf("%s:%s", myAppResource.Spec.Image.Repository, myAppResource.Spec.Image.Tag)
 
-	depl := &appsv1.Deployment{
+	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            myAppResource.Name,
@@ -133,11 +133,7 @@ func constructPodInfoDeployment(myAppResource myv1alpha1.MyAppResource) *appsv1.
 		},
 	}
 
-	// if err := ctrl.SetControllerReference(&myAppResource, depl, r.Scheme); err != nil {
-	// 	return nil, err
-	// }
-
-	return depl
+	return deployment
 }
 
 var (
