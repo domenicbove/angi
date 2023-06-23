@@ -66,8 +66,8 @@ spec:
                 description: UI describes the PodInfo Container UI settings.
                 properties:
                   color:
-                    description: Repository sets the PodInfo UI color. TODO validations,
-                      should look like "#34577c"
+                    description: Repository sets the PodInfo UI color.
+                    pattern: ^#[A-Fa-f0-9]{6}
                     type: string
                   message:
                     description: Message sets the PodInfo UI message.
@@ -83,7 +83,7 @@ spec:
             description: MyAppResourceStatus defines the observed state of MyAppResource
             properties:
               podInfoReadyReplicas:
-                description: podInfoReadyReplicas is the number of pods targeted by
+                description: PodInfoReadyReplicas is the number of pods targeted by
                   the PodInfo Deployment with a Ready Condition.
                 format: int32
                 type: integer

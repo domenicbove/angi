@@ -287,3 +287,43 @@ var _ = Describe("MyAppResource controller", func() {
 	})
 
 })
+
+var _ = Describe("MyAppResource controller - error cases", func() {
+
+	It("Should error MyAppResourceName without required fields", func() {
+		By("By creating a new MyAppResourceName without required ui fields")
+		ctx := context.Background()
+
+		replicas := int32(2)
+
+		myAppResource := &v1alpha1.MyAppResource{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "my.api.group/v1alpha1",
+				Kind:       "MyAppResource",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "whatever",
+				Namespace: "default",
+			},
+			Spec: v1alpha1.MyAppResourceSpec{
+				ReplicaCount: &replicas,
+				//UI is required
+				Image: v1alpha1.Image{
+					Repository: "ghcr.io/stefanprodan/podinfo",
+					Tag:        "latest",
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, myAppResource)).ShouldNot(Succeed())
+
+		By("By creating a new MyAppResourceName with invalid ui fields")
+		myAppResource.Spec.UI = v1alpha1.UI{
+			Color:   "#ddd", // should be six characters
+			Message: "whatever",
+		}
+		Expect(k8sClient.Create(ctx, myAppResource)).ShouldNot(Succeed())
+
+	})
+
+})

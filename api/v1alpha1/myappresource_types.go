@@ -21,27 +21,25 @@ type MyAppResourceSpec struct {
 
 	// +optional
 	Redis *Redis `json:"redis,omitempty"`
-
-	// TODO redis
 }
 
 // Image describes the PodInfo Container image.
 type Image struct {
-	// Repository sets the PodInfo Container image repository.
-	// +kubebuilder:default=ghcr.io/stefanprodan/podinfo
 	// +optional
+	// +kubebuilder:default=ghcr.io/stefanprodan/podinfo
+	// Repository sets the PodInfo Container image repository.
 	Repository string `json:"repository,omitempty"`
 
-	// Tag sets the PodInfo Container image tag.
-	// +kubebuilder:default=latest
 	// +optional
+	// +kubebuilder:default=latest
+	// Tag sets the PodInfo Container image tag.
 	Tag string `json:"tag,omitempty"`
 }
 
 // UI describes the PodInfo Container UI settings.
 type UI struct {
+	// +kubebuilder:validation:Pattern=`^#[A-Fa-f0-9]{6}`
 	// Repository sets the PodInfo UI color.
-	// TODO validations, should look like "#34577c"
 	Color string `json:"color"`
 
 	// Message sets the PodInfo UI message.
@@ -56,11 +54,11 @@ type Redis struct {
 
 // MyAppResourceStatus defines the observed state of MyAppResource
 type MyAppResourceStatus struct {
-	// podInfoReadyReplicas is the number of pods targeted by the PodInfo Deployment with a Ready Condition.
 	// +optional
+	// PodInfoReadyReplicas is the number of pods targeted by the PodInfo Deployment with a Ready Condition.
 	PodInfoReadyReplicas int32 `json:"podInfoReadyReplicas,omitempty"`
-	// RedisReadyReplicas is the number of pods targeted by the Redis Deployment with a Ready Condition.
 	// +optional
+	// RedisReadyReplicas is the number of pods targeted by the Redis Deployment with a Ready Condition.
 	RedisReadyReplicas int32 `json:"redisReadyReplicas,omitempty"`
 }
 
