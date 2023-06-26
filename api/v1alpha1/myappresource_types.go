@@ -14,7 +14,7 @@ type MyAppResourceSpec struct {
 	ReplicaCount *int32 `json:"replicaCount,omitempty"`
 
 	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +optional
 	Image *Image `json:"image,omitempty"`

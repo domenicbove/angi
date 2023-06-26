@@ -60,7 +60,7 @@ func ConstructPodInfoDeployment(myAppResource v1alpha1.MyAppResource) *appsv1.De
 		},
 	}
 
-	if &myAppResource.Spec.Resources != nil {
+	if myAppResource.Spec.Resources != nil {
 		deployment.Spec.Template.Spec.Containers[0].Resources = *myAppResource.Spec.Resources.DeepCopy()
 	}
 

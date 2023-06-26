@@ -10,6 +10,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -80,6 +81,14 @@ var _ = Describe("MyAppResource controller", func() {
 						Repository: "ghcr.io/stefanprodan/podinfo",
 						Tag:        "latest",
 					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"cpu": resource.MustParse("100m"),
+						},
+						Limits: corev1.ResourceList{
+							"memory": resource.MustParse("64Mi"),
+						},
+					},
 					UI: v1alpha1.UI{
 						Color:   "#34577c",
 						Message: "some message",
@@ -124,8 +133,11 @@ var _ = Describe("MyAppResource controller", func() {
 
 			// validate its fields!
 			Expect(*podInfoDeployment.Spec.Replicas).Should(Equal(int32(2)))
+			Expect(len(podInfoDeployment.Spec.Template.Spec.Containers)).Should(Equal(1))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("podinfo"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Image).Should(Equal("ghcr.io/stefanprodan/podinfo:latest"))
+			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String()).Should(Equal("64Mi"))
+			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String()).Should(Equal("100m"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
 				corev1.EnvVar{Name: podinfo.UIColorEnvVar, Value: "#34577c"}))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
@@ -199,6 +211,7 @@ var _ = Describe("MyAppResource controller", func() {
 
 			// validate its fields!
 			Expect(*podInfoDeployment.Spec.Replicas).Should(Equal(int32(1)))
+			Expect(len(podInfoDeployment.Spec.Template.Spec.Containers)).Should(Equal(1))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("podinfo"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Image).Should(Equal("ghcr.io/stefanprodan/podinfo:latest"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
@@ -292,9 +305,6 @@ var _ = Describe("MyAppResource controller - Redis Enabled", func() {
 			Expect(createdMyAppResource.Spec.UI.Color).Should(Equal("#34577c"))
 			Expect(*createdMyAppResource.Spec.ReplicaCount).Should(Equal(int32(1)))
 
-			redisName := fmt.Sprintf("%s-redis", MyAppResourceName)
-			redisLookupKey := types.NamespacedName{Name: redisName, Namespace: MyAppResourceNamespace}
-
 			By("By checking the pod info deployment fields")
 			podInfoDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {
@@ -311,6 +321,9 @@ var _ = Describe("MyAppResource controller - Redis Enabled", func() {
 				corev1.EnvVar{Name: podinfo.CacheEnvVar, Value: fmt.Sprintf("tcp://whatever-redis.%s.svc.cluster.local:6379", MyAppResourceNamespace)}))
 
 			By("By checking the redis deployment fields")
+			redisName := fmt.Sprintf("%s-redis", MyAppResourceName)
+			redisLookupKey := types.NamespacedName{Name: redisName, Namespace: MyAppResourceNamespace}
+
 			redisDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, redisLookupKey, redisDeployment)
@@ -322,6 +335,8 @@ var _ = Describe("MyAppResource controller - Redis Enabled", func() {
 
 			// validate its fields!
 			Expect(redisDeployment.Name).Should(Equal(redisName))
+			Expect(len(redisDeployment.Spec.Template.Spec.Containers)).Should(Equal(1))
+			Expect(redisDeployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("redis"))
 			Expect(redisDeployment.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).Should(Equal(int32(redis.RedisPort)))
 
 			By("By checking the redis service fields")
@@ -336,6 +351,7 @@ var _ = Describe("MyAppResource controller - Redis Enabled", func() {
 
 			// validate its fields!
 			Expect(redisService.Name).Should(Equal(redisName))
+			Expect(len(redisService.Spec.Ports)).Should(Equal(1))
 			Expect(redisService.Spec.Ports[0].Name).Should(Equal("redis"))
 			Expect(redisService.Spec.Ports[0].Port).Should(Equal(int32(redis.RedisPort)))
 			Expect(redisService.Spec.Ports[0].TargetPort).Should(Equal(intstr.IntOrString{IntVal: redis.RedisPort}))
