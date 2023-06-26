@@ -10,9 +10,12 @@ metadata:
   name: whatever
 spec:
   replicaCount: 2
+  # i changed the spec here to match k8s conventions
   resources:
-    memoryLimit: 64Mi
-    cpuRequest: 100m
+    requests:
+      cpu: 100m
+    limits:
+      memory: 64Mi
   image:
     repository: ghcr.io/stefanprodan/podinfo
     tag: latest
@@ -23,7 +26,7 @@ spec:
     enabled: true
 ```
 
-And maps those settings into fields within a [PodInfo](https://github.com/stefanprodan/podinfo) and [Redis](https://github.com/stefanprodan/podinfo) Deployment.
+And maps those settings into fields within [PodInfo](https://github.com/stefanprodan/podinfo) and [Redis](https://github.com/stefanprodan/podinfo) Deployments.
 
 The source code was scaffolded with kubebuilder, see below for the many `make` commands. But the simplest getting started is this:
 
@@ -60,6 +63,11 @@ kubectl delete -f config/samples/my_v1alpha1_myappresource.yaml
 ```
 
 6. Stop the operator with Ctrl+C
+
+7. Uninstall CRDs:
+```
+make uninstall
+```
 
 
 ## Getting Started

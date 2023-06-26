@@ -12,10 +12,9 @@ spec:
   # replicaCount: 2
   resources:
     requests:
-      memory: 64Mi
       cpu: 100m
-  #   memoryLimit: 64Mi
-  #   cpuRequest: 100m
+    limits:
+      memory: 64Mi
   image:
     repository: ghcr.io/stefanprodan/podinfo
     tag: latest
