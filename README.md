@@ -57,14 +57,14 @@ kubectl port-forward deployment/whatever 9898
 curl http://localhost:9898
 ```
 
-5. Delete CR:
+6. Delete CR:
 ```
 kubectl delete -f config/samples/my_v1alpha1_myappresource.yaml
 ```
 
-6. Stop the operator with Ctrl+C
+7. Stop the operator with `Ctrl+C`
 
-7. Uninstall CRDs:
+8. Uninstall CRDs:
 ```
 make uninstall
 ```
