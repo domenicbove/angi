@@ -58,9 +58,9 @@ var _ = Describe("MyAppResource controller", func() {
 		}, timeout, interval).ShouldNot(Succeed())
 	})
 
-	Context("When creating MyAppResourceName", func() {
+	Context("When creating MyAppResource without Redis", func() {
 		It("Should create subresources", func() {
-			By("By creating a new MyAppResourceName")
+			By("By creating a new MyAppResource")
 			ctx := context.Background()
 
 			replicas := int32(2)
@@ -282,6 +282,21 @@ var _ = Describe("MyAppResource controller", func() {
 		Expect(redisService.Spec.Ports[0].Port).Should(Equal(int32(redis.RedisPort)))
 		Expect(redisService.Spec.Ports[0].TargetPort).Should(Equal(intstr.IntOrString{IntVal: redis.RedisPort}))
 		Expect(redisService.Spec.Selector).Should(Equal(map[string]string{"app": redisName}))
+
+		By("By updating the podInfo deployment status")
+		redisDeployment.Status.ReadyReplicas = int32(1)
+		redisDeployment.Status.Replicas = int32(1)
+		Expect(k8sClient.Status().Update(ctx, redisDeployment)).Should(Succeed())
+
+		By("By checking the myappresource status updated")
+		Eventually(func() (int, error) {
+			err := k8sClient.Get(ctx, lookupKey, createdMyAppResource)
+			if err != nil {
+				return 0, err
+			}
+
+			return int(createdMyAppResource.Status.RedisReadyReplicas), nil
+		}, timeout, interval).Should(Equal(1), "podInfoReadyReplicas in status should match the redis deployment")
 	})
 
 })

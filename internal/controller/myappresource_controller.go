@@ -136,7 +136,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 func (r *MyAppResourceReconciler) createOrUpdateDeployment(ctx context.Context, name, namespace string, updatedDeployment *appsv1.Deployment, log logr.Logger) (*appsv1.Deployment, error) {
-	// get existing podinfo deployment
+	// get existing deployment
 	deployment := appsv1.Deployment{}
 	err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deployment)
 	if errors.IsNotFound(err) {
