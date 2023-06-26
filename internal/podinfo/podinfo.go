@@ -15,7 +15,7 @@ const (
 	Port            = 9898
 	UIColorEnvVar   = "PODINFO_UI_COLOR"
 	UIMessageEnvVar = "PODINFO_UI_MESSAGE"
-	CachEnvVar      = "PODINFO_CACHE_SERVER"
+	CacheEnvVar     = "PODINFO_CACHE_SERVER"
 	DefaultImage    = "ghcr.io/stefanprodan/podinfo:latest"
 )
 
@@ -67,7 +67,7 @@ func ConstructPodInfoDeployment(myAppResource v1alpha1.MyAppResource) *appsv1.De
 	// add the redis env var if redis enabled
 	if myAppResource.Spec.Redis != nil && myAppResource.Spec.Redis.Enabled {
 		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env,
-			corev1.EnvVar{Name: CachEnvVar, Value: redis.GetEndpoint(myAppResource.Name, myAppResource.Namespace)})
+			corev1.EnvVar{Name: CacheEnvVar, Value: redis.GetEndpoint(myAppResource.Name, myAppResource.Namespace)})
 	}
 
 	return deployment

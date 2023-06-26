@@ -295,6 +295,21 @@ var _ = Describe("MyAppResource controller - Redis Enabled", func() {
 			redisName := fmt.Sprintf("%s-redis", MyAppResourceName)
 			redisLookupKey := types.NamespacedName{Name: redisName, Namespace: MyAppResourceNamespace}
 
+			By("By checking the pod info deployment fields")
+			podInfoDeployment := &appsv1.Deployment{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lookupKey, podInfoDeployment)
+				if err != nil {
+					return false
+				}
+				return true
+			}, timeout, interval).Should(BeTrue())
+
+			// validate its fields!
+			Expect(podInfoDeployment.Name).Should(Equal(MyAppResourceName))
+			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
+				corev1.EnvVar{Name: podinfo.CacheEnvVar, Value: fmt.Sprintf("tcp://whatever-redis.%s.svc.cluster.local:6379", MyAppResourceNamespace)}))
+
 			By("By checking the redis deployment fields")
 			redisDeployment := &appsv1.Deployment{}
 			Eventually(func() bool {
