@@ -48,6 +48,13 @@ kubectl apply -f config/samples/my_v1alpha1_myappresource.yaml
 ```
 *Edit that file and rerun apply to see updates*
 
+5. Connect to Pod Info Endpoint with port-forward
+```
+kubectl port-forward deployment/whatever 9898
+curl http://localhost:9898
+```
+
+
 5. Delete CR:
 ```
 kubectl delete -f config/samples/my_v1alpha1_myappresource.yaml

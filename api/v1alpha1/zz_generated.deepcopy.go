@@ -108,7 +108,11 @@ func (in *MyAppResourceSpec) DeepCopyInto(out *MyAppResourceSpec) {
 		**out = **in
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
-	out.Image = in.Image
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(Image)
+		**out = **in
+	}
 	out.UI = in.UI
 	if in.Redis != nil {
 		in, out := &in.Redis, &out.Redis

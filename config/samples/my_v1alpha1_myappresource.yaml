@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: angi
   name: whatever
 spec:
-  replicaCount: 2
+  # replicaCount: 2
   resources:
     requests:
       memory: 64Mi

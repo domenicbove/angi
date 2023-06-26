@@ -76,7 +76,7 @@ var _ = Describe("MyAppResource controller", func() {
 				},
 				Spec: v1alpha1.MyAppResourceSpec{
 					ReplicaCount: &replicas,
-					Image: v1alpha1.Image{
+					Image: &v1alpha1.Image{
 						Repository: "ghcr.io/stefanprodan/podinfo",
 						Tag:        "latest",
 					},
@@ -125,6 +125,7 @@ var _ = Describe("MyAppResource controller", func() {
 			// validate its fields!
 			Expect(*podInfoDeployment.Spec.Replicas).Should(Equal(int32(2)))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("podinfo"))
+			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Image).Should(Equal("ghcr.io/stefanprodan/podinfo:latest"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
 				corev1.EnvVar{Name: podinfo.UIColorEnvVar, Value: "#34577c"}))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
@@ -185,8 +186,6 @@ var _ = Describe("MyAppResource controller", func() {
 
 			Expect(createdMyAppResource.Spec.UI.Color).Should(Equal("#34577c"))
 			Expect(*createdMyAppResource.Spec.ReplicaCount).Should(Equal(int32(1)))
-			Expect(createdMyAppResource.Spec.Image.Repository).Should(Equal("ghcr.io/stefanprodan/podinfo"))
-			Expect(createdMyAppResource.Spec.Image.Tag).Should(Equal("latest"))
 
 			By("By checking the podInfo deployment fields")
 			podInfoDeployment := &appsv1.Deployment{}
@@ -201,6 +200,7 @@ var _ = Describe("MyAppResource controller", func() {
 			// validate its fields!
 			Expect(*podInfoDeployment.Spec.Replicas).Should(Equal(int32(1)))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("podinfo"))
+			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Image).Should(Equal("ghcr.io/stefanprodan/podinfo:latest"))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
 				corev1.EnvVar{Name: podinfo.UIColorEnvVar, Value: "#34577c"}))
 			Expect(podInfoDeployment.Spec.Template.Spec.Containers[0].Env).Should(ContainElement(
@@ -248,8 +248,6 @@ var _ = Describe("MyAppResource controller", func() {
 
 		Expect(createdMyAppResource.Spec.UI.Color).Should(Equal("#34577c"))
 		Expect(*createdMyAppResource.Spec.ReplicaCount).Should(Equal(int32(1)))
-		Expect(createdMyAppResource.Spec.Image.Repository).Should(Equal("ghcr.io/stefanprodan/podinfo"))
-		Expect(createdMyAppResource.Spec.Image.Tag).Should(Equal("latest"))
 
 		redisName := fmt.Sprintf("%s-redis", MyAppResourceName)
 		redisLookupKey := types.NamespacedName{Name: redisName, Namespace: MyAppResourceNamespace}
@@ -307,11 +305,7 @@ var _ = Describe("MyAppResource controller - error cases", func() {
 			},
 			Spec: v1alpha1.MyAppResourceSpec{
 				ReplicaCount: &replicas,
-				//UI is required
-				Image: v1alpha1.Image{
-					Repository: "ghcr.io/stefanprodan/podinfo",
-					Tag:        "latest",
-				},
+				//UI is missing
 			},
 		}
 

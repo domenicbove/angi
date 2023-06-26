@@ -16,10 +16,14 @@ const (
 	UIColorEnvVar   = "PODINFO_UI_COLOR"
 	UIMessageEnvVar = "PODINFO_UI_MESSAGE"
 	CachEnvVar      = "PODINFO_CACHE_SERVER"
+	DefaultImage    = "ghcr.io/stefanprodan/podinfo:latest"
 )
 
 func ConstructPodInfoDeployment(myAppResource v1alpha1.MyAppResource) *appsv1.Deployment {
-	image := fmt.Sprintf("%s:%s", myAppResource.Spec.Image.Repository, myAppResource.Spec.Image.Tag)
+	image := DefaultImage
+	if myAppResource.Spec.Image != nil {
+		image = fmt.Sprintf("%s:%s", myAppResource.Spec.Image.Repository, myAppResource.Spec.Image.Tag)
+	}
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
