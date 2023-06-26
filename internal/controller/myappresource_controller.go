@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -90,14 +91,14 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		var err error
 		redisDeployment, err = r.createOrUpdateDeployment(ctx, redisName, myAppResource.Namespace,
-			redis.ConstructRedisDeployment(myAppResource))
+			redis.ConstructRedisDeployment(myAppResource), log)
 
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		if err := r.createOrUpdateService(ctx, redisName, myAppResource.Namespace,
-			redis.ConstructRedisService(myAppResource)); err != nil {
+			redis.ConstructRedisService(myAppResource), log); err != nil {
 
 			return ctrl.Result{}, err
 		}
@@ -105,7 +106,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// create or update the podInfo deployment
 	podInfoDeployment, err := r.createOrUpdateDeployment(ctx, myAppResource.Name,
-		myAppResource.Namespace, podinfo.ConstructPodInfoDeployment(myAppResource))
+		myAppResource.Namespace, podinfo.ConstructPodInfoDeployment(myAppResource), log)
 
 	if err != nil {
 		return ctrl.Result{}, err
@@ -134,9 +135,7 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *MyAppResourceReconciler) createOrUpdateDeployment(ctx context.Context, name, namespace string, updatedDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
-	log := log.FromContext(ctx)
-
+func (r *MyAppResourceReconciler) createOrUpdateDeployment(ctx context.Context, name, namespace string, updatedDeployment *appsv1.Deployment, log logr.Logger) (*appsv1.Deployment, error) {
 	// get existing podinfo deployment
 	deployment := appsv1.Deployment{}
 	err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deployment)
@@ -168,9 +167,7 @@ func deploymentSpecr(deploy *appsv1.Deployment, spec appsv1.DeploymentSpec) cont
 	}
 }
 
-func (r *MyAppResourceReconciler) createOrUpdateService(ctx context.Context, name, namespace string, updatedService *corev1.Service) error {
-	log := log.FromContext(ctx)
-
+func (r *MyAppResourceReconciler) createOrUpdateService(ctx context.Context, name, namespace string, updatedService *corev1.Service, log logr.Logger) error {
 	// get existing service
 	service := corev1.Service{}
 	err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &service)
@@ -195,7 +192,6 @@ func (r *MyAppResourceReconciler) createOrUpdateService(ctx context.Context, nam
 	return nil
 }
 
-// TODO try in code func definition
 func serviceSpecr(service *corev1.Service, spec corev1.ServiceSpec) controllerutil.MutateFn {
 	return func() error {
 		service.Spec = spec
