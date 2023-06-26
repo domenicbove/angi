@@ -54,7 +54,6 @@ kubectl port-forward deployment/whatever 9898
 curl http://localhost:9898
 ```
 
-
 5. Delete CR:
 ```
 kubectl delete -f config/samples/my_v1alpha1_myappresource.yaml
